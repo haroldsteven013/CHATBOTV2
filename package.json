@@ -6,7 +6,8 @@
     "scripts": {
         "prestart": "npx eslint . --no-ignore",
         "pre-copy": "cd .. && npm run  copy.lib base-baileys-memory",
-        "start": "node app.js"
+        "start": "node app.js",
+        "build": "webpack"
     },
     "keywords": [],
     "dependencies": {
@@ -22,7 +23,9 @@
     },
     "devDependencies": {
         "eslint": "^8.52.0",
-        "eslint-plugin-bot-whatsapp": "latest"
+        "eslint-plugin-bot-whatsapp": "latest",
+        "webpack": "^5.92.1",
+        "webpack-cli": "^5.1.4"
     },
     "author": "",
     "license": "ISC"

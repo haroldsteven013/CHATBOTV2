@@ -199,10 +199,10 @@ const flowDetalleCaso = addKeyword(EVENTS.ACTION)
     }
     else{
         let bool = ctx.body;
-        if(['si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
+        if(['si','Sí','SI','Si','SÍ','Yes','yes'].includes(normalizeString(bool))){
             await flowDynamic('Escribe *volver* para ver los detalles de otro caso. \nEscribe *creacion* si desea crear un caso o bien, escriba *salir* para terminar con la solicitud.');
         }
-        else if (['No','no'].includes(normalizeString(bool))) {
+        else if (['No','no','NO'].includes(normalizeString(bool))) {
             return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
         } else {
             return fallBack('Por favor, ingresa una opción válida');
@@ -284,7 +284,7 @@ const flowTickets =addKeyword(EVENTS.ACTION)
 
          // Expresiones regulares para extraer los valores de 'id' y 'sym'
          let idRegex = /<AttrName>id<\/AttrName>\s*<AttrValue>(.*?)<\/AttrValue>/g;
-         let symRegex = /<AttrName>sym<\/AttrName>\s*<AttrValue>(.*?)<\/AttrValue>/g;
+         let symRegex = /<AttrName>ss_sym<\/AttrName>\s*<AttrValue>(.*?)<\/AttrValue>/g;
          let ids = extractValues(idRegex, listaG2);
          let syms = extractValues(symRegex, listaG2);
  
@@ -343,7 +343,6 @@ const flowTickets =addKeyword(EVENTS.ACTION)
     else{
 
         const eleccion = parseInt(ctx.body);
-        let esCorrecto = '';
         let encontrado = false;
         let lista =JSON.parse(JSON.stringify(state.get('lista')));
         for (let i = 0; i < lista.length; i++){
@@ -409,11 +408,12 @@ const flowCreation = addKeyword(EVENTS.ACTION)
 });
 
 const flowVolver = addKeyword(EVENTS.ACTION)
-.addAction({capture:true},async(ctx,{state,gotoFlow})=>{
+.addAction({capture:true},async(ctx,{state,gotoFlow,flowDynamic})=>{
     if(['si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(ctx.body))){
         let cancelo = true;
+        await flowDynamic('Volviendo a la lista de soluciones..');
         await state.update({cancelo: cancelo});
-        return gotoFlow(flowFinal);
+        return gotoFlow(flowJuno);
     }
     else if (['no','No','NO'].includes(normalizeString(ctx.body))){
         await flowDynamic('Solicitud cancelada. Volviendo al menú principal.');
@@ -422,21 +422,14 @@ const flowVolver = addKeyword(EVENTS.ACTION)
 });
 
 const flowFinal = addKeyword(EVENTS.ACTION)
-.addAction( async(_, {state,gotoFlow,flowDynamic,endFlow})=>{
+.addAction( async(_, {state,flowDynamic,endFlow})=>{
             const msgTicket = {
                 cnt: state.get('cnt'),
                 categoria: state.get('pcat') ,
                 asunto: state.get('asunto'),
                 descripcion: state.get('desc')
             };
-        let cancelo = false;
-        cancelo = state.get('cancelo');
-        if(cancelo == true){
-            await flowDynamic('Volviendo a la lista soluciones..');
-            return gotoFlow(flowTickets)
-        }else{
 
-        
                 // Enviar los datos a la API Gateway
                 try {
                     const response = await axios.post('http://192.168.10.83:8080/WPTickets', msgTicket);
@@ -465,7 +458,7 @@ const flowFinal = addKeyword(EVENTS.ACTION)
                     console.error('Configuración de Axios:', error.config);
                     return endFlow('No se puedo realizar tu solicitud. Por favor, intenta de nuevo.');
                 };
-            };
+            
 })
 .addAction({capture:true},async(ctx,{flowDynamic,fallBack,endFlow})=>{
     if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
@@ -491,7 +484,7 @@ const flowFinal = addKeyword(EVENTS.ACTION)
         let bool = ctx.body;
         if(['consulta','Consulta','CONSULTA'].includes(normalizeString(bool))){
             await flowDynamic('Regresando a la lista de casos....');
-            return gotoFlow(flowCaso);
+            return gotoFlow(flowConsulta);
         }
         else if (['creacion','creación','CREACION','CREACIÓN','Creacion','Creación'].includes(normalizeString(bool))) {
             return gotoFlow(flowJuno);
