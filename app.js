@@ -35,7 +35,7 @@ function decodeHtmlEntities(text) {
         '&#39;': "'",
         '&#xF3;': 'ó',
         '&#xE9;': 'é',
-	'&#xED;': 'Í'
+	'&#xED;': 'í'
         // Puedes agregar más entidades según sea necesario
     };
 
