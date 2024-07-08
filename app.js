@@ -34,7 +34,8 @@ function decodeHtmlEntities(text) {
         '&quot;': '"',
         '&#39;': "'",
         '&#xF3;': 'ó',
-        '&#xE9;': 'é'
+        '&#xE9;': 'é',
+	'&#xED;': 'Í'
         // Puedes agregar más entidades según sea necesario
     };
 
@@ -170,7 +171,7 @@ const flowDetalleCaso = addKeyword(EVENTS.ACTION)
          let jsoncont = JSON.parse(JSON.stringify(state.get('contenidoCaso')));
          console.log(jsoncont.ref_num);
          
-        message = ' *Numero de referencia:* ' + contenido.ref_num + '\n *Descripción:* ' + contenido.summary + '\n *Estado:* '+ contenido.status + '\n *Solución:* '+ contenido.cat;
+        message = ' *Numero de referencia:* ' + contenido.ref_num + '\n *Descripción:* ' + decodeHtmlEntities(contenido.summary) + '\n *Estado:* '+ decodeHtmlEntities(contenido.status) + '\n *Solución:* '+ contenido.cat;
         await flowDynamic(nombre + ', estos son los detalles del caso seleccionado: \n \n'+ message + '\n \n¿Desea realizar alguna otra solicitud? (Sí/No)');
 
     } catch (error) {
@@ -199,7 +200,7 @@ const flowDetalleCaso = addKeyword(EVENTS.ACTION)
     }
     else{
         let bool = ctx.body;
-        if(['si','Sí','SI','Si','SÍ','Yes','yes'].includes(normalizeString(bool))){
+        if(['sí','si','Sí','SI','Si','SÍ','Yes','yes'].includes(normalizeString(bool))){
             await flowDynamic('Escribe *volver* para ver los detalles de otro caso. \nEscribe *creacion* si desea crear un caso o bien, escriba *salir* para terminar con la solicitud.');
         }
         else if (['No','no','NO'].includes(normalizeString(bool))) {
@@ -249,7 +250,7 @@ const flowTickets =addKeyword(EVENTS.ACTION)
     let nombreUser = rtaUserID.first_name;
     await state.update({nombreUser: nombreUser});
     switch (zcliente) {
-        case "400020": // SDH
+case "400020": // SDH
             categoria="400168,400169,400051,400165,400166,400167,400053,400052,400168";
             break;
         case "400024": // TIGO-UNE
@@ -258,11 +259,83 @@ const flowTickets =addKeyword(EVENTS.ACTION)
         case "400017": // DNP
             categoria="400052,400051,400053,400165,400166,400167,400052";
             break;
-		case "400078": // BURO
+	case "400078": // BURO
             categoria="400160,400161,400160";
             break;
+	case "400027": // TELEFÓNICA
+            categoria="400002,400308,400002";
+            break;	
+	case "400002": // SURA
+            categoria="400001,400002,400101,400160,400163,400001";
+            break;	
+	case "400030": // SONDA
+            categoria="400168,400168";
+            break;	
+	case "400023": // SNR
+            categoria="400051,400053,400001,400002,400101,400163,400160,400168,400173,400174,400052,400175,400176,400258,400051";
+            break;
+	case "400031": // Skynet
+            categoria="400175,400175";
+            break;
+	case "400074": // SENA
+            categoria="400002,400002";
+            break;	
+	case "400029": // SEFIN
+            categoria="400001,400002,400160,400163,400001";
+            break;	
+	case "400026": // POLICIA
+            categoria="400002,400002";
+            break;
+	case "400079": // PGN
+            categoria="400001,400002,400101,400160,400161,400162,400163,400168,400169,400172,400173,400174,400001";
+            break;
+	case "400001": // MINHACIENDA
+            categoria="400168,400169,400168";
+            break;	
+	case "400006": // MinCiencias
+            categoria="400051,400165,400166,400167,400053,400052,400168,400169,400170,400160,400051";
+            break;
+	case "400018": // MinAgricultura
+            categoria="400175,400176,400175";
+            break;	
+	case "400071": // MEN
+            categoria="400001,400101,400001,400002,400051,400053,400166,400167,400169,400168,400172,400001";
+            break;	
+	case "400067": // LUBI
+            categoria="400165,400166,400167,400051,400173,400165";
+            break;
+	case "400069": // LUBI
+            categoria="400165,400166,400167,400051,400173,400165";
+            break;	
+	case "400032": // JEP
+            categoria="400158,400002,400168,400408,400158";
+            break;	
+	case "400021": // ILUMNO
+            categoria="400051,400167,400053,400051";
+            break;	
+	case "400072": // Frontera
+            categoria="400001,400001";
+            break;	
+	case "400025": // DIMAR
+            categoria="400175,400176,400175";
+            break;	
+	case "400028": // Coljuegos
+            categoria="400001,400101,400001";
+            break;	
+	case "400022": // CGR
+            categoria="400051,400165,400166,400167,400053,400168,400169,400170,400174,400052,400051";
+            break;
+	case "400003": // Catastro
+            categoria="400001,400002,400101,400160,400163,400001";
+            break;	
+	case "400076": // ARN
+            categoria="400359,400359";
+            break;
+	case "400004": // Acueducto
+            categoria="400001,400002,400101,400160,400163,400001";
+            break;		
         default:
-            categoria="5100,5101,5102,5103,5109,400001,400002,400051,400052,400053,400101,400158,400160,400161,400162,400163,400165,400166,400167,400168,400169,400170,400171,400172,400173,400174,400175,400176,400258,400308,400359,400360,400408,400409,400410,400411";
+            categoria="5100,5101,5102,5103,5109,400001,400002,400051,400052,400053,400101,400158,400160,400161,400162,400163,400165,400166,400167,400168,400169,400170,400171,400172,400173,400174,400175,400176,400258,400308,400359,400360,400408,400409,400410,400411,5100";
             break;
     };
     console.log(categoria);
@@ -394,11 +467,11 @@ const flowCreation = addKeyword(EVENTS.ACTION)
     }
     else{          
         let bool = ctx.body;
-        if(['si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
+        if(['sí','si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
           await flowDynamic('Procesando solicitud... ');
           return gotoFlow(flowFinal);
         }
-        else if (['No','no'].includes(normalizeString(bool))){
+        else if (['No','no','NO'].includes(normalizeString(bool))){
           await flowDynamic('Comprendo. ¿Desea volver a ingresar la información (Sí), o cancelar la solicitud de creación? (No)');
           return gotoFlow(flowVolver);
         } else {
@@ -409,7 +482,7 @@ const flowCreation = addKeyword(EVENTS.ACTION)
 
 const flowVolver = addKeyword(EVENTS.ACTION)
 .addAction({capture:true},async(ctx,{state,gotoFlow,flowDynamic})=>{
-    if(['si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(ctx.body))){
+    if(['Si','sí','si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(ctx.body))){
         let cancelo = true;
         await flowDynamic('Volviendo a la lista de soluciones..');
         await state.update({cancelo: cancelo});
@@ -466,10 +539,10 @@ const flowFinal = addKeyword(EVENTS.ACTION)
     }
     else{
         let bool = ctx.body;
-        if(['si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
+        if(['sí','Si','si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
             await flowDynamic('Escribe *consulta* para consultar los casos del usuario. \nEscribe *creacion* si desea crear un caso o bien, escriba *salir* para terminar con la solicitud.');
         }
-        else if (['No','no'].includes(normalizeString(bool))) {
+        else if (['No','no','NO'].includes(normalizeString(bool))) {
             return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
         } else {
             return fallBack('Por favor, ingresa una opción válida');
