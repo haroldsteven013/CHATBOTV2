@@ -35,7 +35,8 @@ function decodeHtmlEntities(text) {
         '&#39;': "'",
         '&#xF3;': 'ó',
         '&#xE9;': 'é',
-	'&#xED;': 'í'
+	    '&#xED;': 'í',
+        '&#xE1;': 'á'
         // Puedes agregar más entidades según sea necesario
     };
 
@@ -589,7 +590,15 @@ const flowInicio = addKeyword(EVENTS.WELCOME)
                 const listaG = response.data;
                 console.log(listaG);
                 await state.update({ListaPrin: listaG});
-                return gotoFlow(flowPrincipal);
+                const listaJSON = JSON.parse(JSON.stringify(listaG));
+                const zcliente = listaJSON.zcliente;
+                if(zcliente==='1'|| zcliente==='400065'){
+                    return gotoFlow(flowAnalista);
+                }
+                else{
+                    return gotoFlow(flowPrincipal);
+                };
+                
             } catch (error) {
                 if (error.response) {
                     // El servidor respondió con un código de estado fuera del rango 2xx
@@ -638,9 +647,451 @@ const flowPrincipal = addKeyword(EVENTS.ACTION)
         }
     });
 
+const flowAnalista = addKeyword( EVENTS.ACTION)
+    .addAction(async(_, {state,flowDynamic} ) =>{
+        const lista = JSON.stringify(state.get('ListaPrin'));
+        const listaG = JSON.parse(lista);
+        const nombre = listaG.first_name;
+        await flowDynamic('Bienvenido, analista '+ nombre + ' . ¿Qué te gustaría hacer? \n1. Consultar los detalles de uno de mis casos \n2. Agregar un comentario a uno de mis casos \n3. Cambiar el estado de uno de mis casos');
+    })
+    .addAction({capture:true}, 
+        async(ctx, {state,flowDynamic,endFlow,fallBack,gotoFlow})=>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{        
+                if(parseInt(ctx.body) == 1){
+                    await state.update({option: parseInt(ctx.body)});
+                    await flowDynamic('De acuerdo');
+                    return gotoFlow(flowConsultarCasosAnalista);
+                }
+                else if (parseInt(ctx.body) == 2) {
+                    await state.update({option: parseInt(ctx.body)});
+                    await flowDynamic('De acuerdo');
+                    return gotoFlow(flowConsultarCasosAnalista);
+                }
+                else if (parseInt(ctx.body) == 3) {
+                    await state.update({option: parseInt(ctx.body)});
+                    await flowDynamic('De acuerdo');
+                    return gotoFlow(flowConsultarCasosAnalista);
+                } 
+                else{
+                    return fallBack('Opción no válida. Por favor, intenta de nuevo.');
+                };
+            }
+        });
+const flowConsultarCasosAnalista = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {state,flowDynamic,gotoFlow}) =>{
+            let itemsConsulta = [];
+            const UserID = state.get('userId');
+            const reqData = {
+                UserID: UserID
+            };
+            try {
+                const response = await axios.post('http://192.168.10.83:8080/WPConsulta', reqData);
+                console.log('Datos enviados correctamente:', response.data);
+                const listaCasos = response.data;
+                // Convertir entidades HTML a caracteres normales
+                listaConsulta = listaCasos.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+                console.log('lista:' + listaConsulta);
+
+                // Expresiones regulares para extraer los valores de 'id' y 'sym'
+                let refNumRegex = /<AttrName>ref_num<\/AttrName>\s*<AttrValue>(.*?)<\/AttrValue>/g;
+                let refNum = extractValues(refNumRegex, listaConsulta);
+                console.log('ref:' + refNum);
+                         // Crear una lista con los valores
+                for (let i = 0; i < refNum.length; i++) {
+                    itemsConsulta.push({
+                        item: i + 1,
+                        id: refNum[i]
+                    });
+                 };
+                console.log('estado:'+ JSON.stringify(itemsConsulta));
+                await state.update({itemsConsulta: itemsConsulta});
+                console.log(state.get('itemsConsulta'));
+                if(itemsConsulta != ''){
+                    return gotoFlow(opcionesCasoScene);
+                }
+                else{
+                    await flowDynamic('No se encontraron casos relacionados a la cuenta. Terminando la solicitud...');
+                    return gotoFlow(usernameScene);
+                };        
+            } catch (error) {
+                if (error.response) {
+                    // El servidor respondió con un código de estado fuera del rango 2xx
+                    console.error('Error en la respuesta del servidor:', error.response.data);
+                    console.error('Código de estado:', error.response.status);
+                    console.error('Encabezados:', error.response.headers);
+                    
+                } else if (error.request) {
+                    // La solicitud fue hecha pero no hubo respuesta
+                    console.error('No hubo respuesta del servidor:', error.request);
+                    
+                } else {
+                    // Algo sucedió al configurar la solicitud
+                    console.error('Error al configurar la solicitud:', error.message);
+                }
+                console.error('Configuración de Axios:', error.config);
+                await flowDynamic('Hubo un error en la consulta. Por favor, inténtalo de nuevo.');
+                return gotoFlow(flowAnalista);
+            }
+        });
+
+const opcionesCasoScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {state,flowDynamic}) =>{
+            let rtaCasosUser = state.get('itemsConsulta');
+            const listaG = JSON.stringify(state.get('ListaPrin'));
+            const lista = JSON.parse(listaG);
+            let nombre = lista.first_name;
+            let message = '';
+            let option = state.get('option');
+            console.log('option:'+option);
+            for(let i=0; i < rtaCasosUser.length; i++) {
+                message += rtaCasosUser[i].item + '. ' + rtaCasosUser[i].id + '\n';
+            };
+            if(option=== 1){
+                await flowDynamic(nombre+ ', estos son los casos activos actualmente: \n' + message + '\n Escribe el número del ítem del caso el cual desea saber más detalles.');
+            }
+            else if(option=== 2){
+                await flowDynamic(nombre+ ', estos son los casos activos actualmente: \n' + message + '\n Escribe el número del ítem del caso el cual desea agregar un comentario.');
+            }
+            else if(option=== 3){
+                await flowDynamic(nombre+ ', estos son los casos activos actualmente: \n' + message + '\n Escribe el número del ítem del caso el cual desea cambiar el estado.');
+            }
+
+        })
+        .addAction({capture:true}, async(ctx, {state,gotoFlow,fallBack,endFlow}) =>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{
+                let eleccion = parseInt(ctx.body);
+                let encontrado = false;
+                let lista = state.get('itemsConsulta');
+                for (let i = 0; i < lista.length; i++){
+                    if(lista[i].item == eleccion ){ 
+                        encontrado = true;
+                        let caso = lista[i].id;
+                        await state.update({caso: caso});
+                        return gotoFlow(detalleCasoAnalistaScene);
+                        
+                    };
+                };
+                if(!encontrado){
+                    return fallBack('Opción no válida. Por favor, intenta de nuevo.');
+                };
+            };
+
+        });
+
+const detalleCasoAnalistaScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {state,flowDynamic,gotoFlow}) =>{
+            let ref_num = state.get('caso');
+            const reqData = {
+                ref_num: ref_num
+            };
+            try {
+                const response = await axios.post('http://192.168.10.83:8080/WPConsultaDetalle', reqData);
+                console.log('Datos enviados correctamente:', response.data);
+                await state.update({contenido: response.data});
+                const option = state.get('option');
+                if(option===1){
+                    return gotoFlow(postDetalleAnalistaScene);
+                }
+                else if(option===2){
+                    return gotoFlow(agregarComentarioAnalistaScene);
+                }
+                else if(option===3){
+                    return gotoFlow(listaEstadoAnalistaScene);
+                };
+            } catch (error) {
+                if (error.response) {
+                    // El servidor respondió con un código de estado fuera del rango 2xx
+                    console.error('Error en la respuesta del servidor:', error.response.data);
+                    console.error('Código de estado:', error.response.status);
+                    console.error('Encabezados:', error.response.headers);
+                    
+                } else if (error.request) {
+                    // La solicitud fue hecha pero no hubo respuesta
+                    console.error('No hubo respuesta del servidor:', error.request);
+                    
+                } else {
+                    // Algo sucedió al configurar la solicitud
+                    console.error('Error al configurar la solicitud:', error.message);
+                }
+                console.error('Configuración de Axios:', error.config);
+                await flowDynamic('Hubo un error en la consulta. Por favor, inténtalo de nuevo.');
+                return gotoFlow(flowAnalista);
+            }
+
+        });
+const postDetalleAnalistaScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_,{state,flowDynamic}) =>{
+            const listaG = JSON.stringify(state.get('ListaPrin'));
+            const lista = JSON.parse(listaG);
+            let nombre = lista.first_name;
+            const contenido = state.get('contenido');
+            let message= ' Numero de referencia: ' + contenido.ref_num + '\n Descripción: ' + contenido.summary + '\n Estado: '+ contenido.status + '\n Solución: '+ contenido.cat;
+            await flowDynamic(nombre + ', estos son los detalles del caso seleccionado: \n \n'+ message + '\n \n¿Desea realizar alguna otra solicitud? (Sí/No)');
+        })
+        .addAction({capture:true}, async(ctx, {flowDynamic,gotoFlow,endFlow,fallBack}) =>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{
+                let bool = ctx.body;
+                if(['sí','Si','si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
+                    await flowDynamic('Volviendo al menú inicial.');
+                    return gotoFlow(flowAnalista);
+                }
+                else if (['No','no','NO'].includes(normalizeString(bool))) {
+                    return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+                } else {
+                    return fallBack('Por favor, ingresa una opción válida');
+                };
+            }
+        });
+const agregarComentarioAnalistaScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {flowDynamic})=>{
+            await flowDynamic('¿Cuál es el comentario a agregar?');
+        })
+        .addAction({capture:true}, async(ctx, {state,flowDynamic,gotoFlow,endFlow}) =>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{
+                await state.update({comentario: normalizeString(ctx.body)});
+                await flowDynamic('Procesando solicitud..');
+                return gotoFlow(comentandoScene);
+            };
+        });
+    
+const comentandoScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {state,flowDynamic,gotoFlow}) =>{
+            const contenido = state.get('contenido');
+            const reqData = {
+                cr: contenido.cr,
+                comentario: state.get('comentario')
+            };
+            try {
+                const response = await axios.post('http://192.168.10.83:8080/WPAgregarComentario', reqData);
+                console.log('Datos enviados correctamente:', response.data);
+                await state.update({contenidoComentario: response.data});
+                return gotoFlow(postComentarioAnalistaScene);
+
+            } catch (error) {
+                if (error.response) {
+                    // El servidor respondió con un código de estado fuera del rango 2xx
+                    console.error('Error en la respuesta del servidor:', error.response.data);
+                    console.error('Código de estado:', error.response.status);
+                    console.error('Encabezados:', error.response.headers);
+                    
+                } else if (error.request) {
+                    // La solicitud fue hecha pero no hubo respuesta
+                    console.error('No hubo respuesta del servidor:', error.request);
+                    
+                } else {
+                    // Algo sucedió al configurar la solicitud
+                    console.error('Error al configurar la solicitud:', error.message);
+                }
+                console.error('Configuración de Axios:', error.config);
+                await flowDynamic('Hubo un error en la consulta. Por favor, inténtalo de nuevo.');
+                return gotoFlow(flowAnalista);
+            }
+        });
+    
+const postComentarioAnalistaScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {state,flowDynamic}) =>{
+            const listaG = JSON.stringify(state.get('ListaPrin'));
+            const lista = JSON.parse(listaG);
+            let nombre = lista.first_name;
+            const contenido = state.get('contenido');
+            let ref = contenido.ref_num;
+            await  flowDynamic(nombre + ', su comentario para el caso '+ ref+' fue exitosamente registrado! \n \n¿Desea realizar alguna otra solicitud? (Sí/No)');           
+        })
+        .addAction({capture:true}, async(ctx, {flowDynamic,gotoFlow,fallBack,endFlow}) =>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{
+                let bool = ctx.body;
+                if(['sí','Si','si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
+                    await flowDynamic('Volviendo al menú inicial.');
+                    return gotoFlow(flowAnalista);
+                }
+                else if (['No','no','NO'].includes(normalizeString(bool))) {
+                    return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+                } else {
+                    return fallBack('Por favor, ingresa una opción válida');
+                };
+            }
+        });
+    
+const listaEstadoAnalistaScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {state,flowDynamic,gotoFlow})=>{
+            let itemsEstados = [];
+            try {
+                const response = await axios.post('http://192.168.10.83:8080/WPEstados');
+                console.log('Datos enviados correctamente:', response.data);
+                const listaG = response.data;
+                // Convertir entidades HTML a caracteres normales
+                let listaConsulta = decodeHtmlEntities(listaG.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'));
+                console.log('lista:' + listaConsulta);
+        
+                // Expresiones regulares para extraer los valores de 'sym'
+                let symRegex = /<AttrName>sym<\/AttrName>\s*<AttrValue>(.*?)<\/AttrValue>/g;
+                let estados = extractValues(symRegex, listaConsulta);
+                console.log('estados:' + estados);
+        
+                // Expresión regular para extraer los valores de 'crs'
+                let crsRegex = /<Handle>(crs:\d+)<\/Handle>/g;
+                let crsValues = extractValues(crsRegex, listaConsulta);
+                console.log('crsValues:', crsValues);
+        
+                // Crear una lista con los valores
+                for (let i = 0; i < estados.length; i++) {
+                    itemsEstados.push({
+                        item: i + 1,
+                        estado: estados[i],
+                        crs: crsValues[i]
+                    });
+                };
+                await state.update({itemsEstados: itemsEstados});
+                if (itemsEstados.length > 0) {
+                    // Responder al usuario con la lista de estados
+                    let replyMessage = 'Escribe el número del ítem del nuevo estado a asignar para el caso seleccionado|:\n';
+                    itemsEstados.forEach(item => {
+                        replyMessage += `${item.item}. ${item.estado}\n`;
+                    });
+                    await flowDynamic(replyMessage);
+                } else {
+                    await flowDynamic('No se encontraron estados. Volviendo al menú.');
+                    return gotoFlow(flowAnalista); // Salir de la escena
+                }
+
+            } catch (error) {
+                if (error.response) {
+                    // El servidor respondió con un código de estado fuera del rango 2xx
+                    console.error('Error en la respuesta del servidor:', error.response.data);
+                    console.error('Código de estado:', error.response.status);
+                    console.error('Encabezados:', error.response.headers);
+                    
+                } else if (error.request) {
+                    // La solicitud fue hecha pero no hubo respuesta
+                    console.error('No hubo respuesta del servidor:', error.request);
+                    
+                } else {
+                    // Algo sucedió al configurar la solicitud
+                    console.error('Error al configurar la solicitud:', error.message);
+                }
+                console.error('Configuración de Axios:', error.config);
+                await flowDynamic('Hubo un error en la consulta. Por favor, inténtalo de nuevo.');
+                return gotoFlow(flowAnalista);
+            }
+        })
+        .addAction({capture:true}, async(ctx,{state,gotoFlow,fallBack,endFlow})=>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{
+                let lista = state.get('itemsEstados');
+                const eleccion = parseInt(ctx.body);
+                let encontrado = false;
+                for (let i = 0; i < lista.length; i++){
+                    if(lista[i].item == eleccion ){ 
+                        encontrado = true;
+                        let decodedSym = lista[i].estado;
+                        let crs = lista[i].crs;
+                        await state.update({estadoNuevo: decodedSym});
+                        await state.update({crs:crs});
+                        return gotoFlow(cambioEstadoScene);
+                    };
+                };
+                if(!encontrado){
+                    return fallBack('Por favor, ingresa una opción válida');
+                };
+            }
+
+
+        });
+
+const cambioEstadoScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {flowDynamic}) =>{
+            await flowDynamic('Ahora escribe el motivo del cambio de estado:');
+        })
+        .addAction({capture:true}, async(ctx,{state,flowDynamic,gotoFlow,endFlow}) =>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{
+                const contenido = state.get('contenido');
+                const motivo = normalizeString(ctx.body);
+                const listaG = JSON.stringify(state.get('ListaPrin'));
+                const lista = JSON.parse(listaG);
+                const cnt = lista.ID;
+                const crs = state.get('crs');
+                const msg = {
+                    motivo: motivo,
+                    cnt: cnt,
+                    cr: contenido.cr,
+                    crs: crs
+                };
+                try {
+                    const response = await axios.post('http://192.168.10.83:8080/WPCambioEstado', msg);
+                    console.log('Datos enviados correctamente:', response.data);
+                    return gotoFlow(postCambioEstadoScene);
+    
+                } catch (error) {
+                    if (error.response) {
+                        // El servidor respondió con un código de estado fuera del rango 2xx
+                        console.error('Error en la respuesta del servidor:', error.response.data);
+                        console.error('Código de estado:', error.response.status);
+                        console.error('Encabezados:', error.response.headers);
+                        
+                    } else if (error.request) {
+                        // La solicitud fue hecha pero no hubo respuesta
+                        console.error('No hubo respuesta del servidor:', error.request);
+                        
+                    } else {
+                        // Algo sucedió al configurar la solicitud
+                        console.error('Error al configurar la solicitud:', error.message);
+                    }
+                    console.error('Configuración de Axios:', error.config);
+                    await flowDynamic('Hubo un error en la consulta. Por favor, inténtalo de nuevo.');
+                    return gotoFlow(flowAnalista);
+                }
+            };
+
+        });
+
+const postCambioEstadoScene = addKeyword(EVENTS.ACTION)
+        .addAction(async(_, {state,flowDynamic})=>{
+            const estado = state.get('estadoNuevo');
+            const contenido = state.get('contenido');
+            const ref_num = contenido.ref_num;
+            await flowDynamic('El cambio de estado a '+ estado + ' para el caso ' + ref_num + ' fue exitoso! ¿Desea realizar alguna otra solicitud? (Sí/No)');
+        })
+        .addAction({capture:true}, async(ctx, {gotoFlow,flowDynamic,endFlow,fallBack}) =>{
+            if(['salir','Salir','SALIR','quit','QUIT','0'].includes(normalizeString(ctx.body))){
+                return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+            }
+            else{
+                let bool = ctx.body;
+                if(['sí','Si','si','Sí','SI','SÍ','Yes','yes'].includes(normalizeString(bool))){
+                    await flowDynamic('Volviendo al menú inicial.');
+                    return gotoFlow(flowAnalista);
+                }
+                else if (['No','no','NO'].includes(normalizeString(bool))) {
+                    return endFlow('Terminando solicitud. Gracias por utilizar nuestros servicios!');
+                } else {
+                    return fallBack('Por favor, ingresa una opción válida');
+                };
+            }
+        });
+
 const main = async () => {
     const adapterDB = new MockAdapter();
-    const adapterFlow = createFlow([flowPrincipal,flowTickets,flowCreation,flowJuno,flowVolver,flowFinal,flowConsulta, flowCaso,flowDetalleCaso, flowInicio]);
+    const adapterFlow = createFlow([postCambioEstadoScene,cambioEstadoScene,postComentarioAnalistaScene,comentandoScene,postDetalleAnalistaScene,agregarComentarioAnalistaScene,listaEstadoAnalistaScene,flowPrincipal,flowTickets,flowCreation,flowJuno,flowVolver,flowFinal,flowConsulta, flowCaso,flowDetalleCaso, flowInicio, flowAnalista,flowConsultarCasosAnalista,opcionesCasoScene,detalleCasoAnalistaScene]);
     const adapterProvider = createProvider(BaileysProvider);
 
     createBot({
